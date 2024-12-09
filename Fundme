@@ -1,0 +1,60 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.8;
+
+// import Chainlink Price feed Interface
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+
+contract Fundme {
+    //mapping store money address send to
+    mapping(address => uint256) public addressToAmountFunded;
+
+    // list of all funders
+    address[] public funders;
+
+    // address owner
+    address public owner;
+
+    // variable store chainlink price feed
+    AggregatorV3Interface public priceFeed;
+
+    // Contructor to launch contract
+
+    constructor(address _priceFeed) {
+        owner = msg.sender; // owner launch
+        priceFeed = AggregatorV3Interface(_priceFeed);
+    }
+
+    //function send money to contract
+    function fund() public payable {
+        uint256 minimumUSD = 50 *1e18;
+        require(getConversionRate(msg.value) >= minimumUSD, "You need to send at least $50 of ETH!");
+        addressToAmountFunded[msg.sender] += msg.value; //update money send
+        funders.push(msg.sender);
+    }
+
+    //ham lay gia eth usd
+    function getPrice() public view returns (uint256){
+        (, int256 price, , , ) = priceFeed.latestRoundData();
+        return uint256(price * 1e10);
+    }
+    
+    // ham chuyen doi so tien gui eth sang usd
+    function getConversionRate(uint256 ethAmount) public view returns (uint256) {
+        uint256 ethPrice = getPrice();
+        return (ethPrice * ethAmount) / 1e18;
+    }
+
+    //ham rut toan bo so tien tu hop dong
+    function withdraw() public {
+        require(msg.sender == owner, "Only the Owner can withdraw funds!");
+        payable(owner).transfer(address(this).balance);
+        //reset so tien da gui cua cac dia chi
+        for (uint256 i = 0; i < funders.length; i++) {
+            address funder = funders[i];
+            addressToAmountFunded[funder] = 0;
+        }
+
+        //reset danh sach nguoi gui
+        delete funders;
+    }
+}
